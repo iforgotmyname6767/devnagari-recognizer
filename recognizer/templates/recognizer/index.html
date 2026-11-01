@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>Devanagari Recognizer</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 30px; }
+    canvas { background: #000; border: 2px solid #888; touch-action: none; max-width: 95vw; }
+    #result { font-size: 64px; margin: 10px; }
+    button { padding: 8px 18px; margin: 4px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>Draw one Devanagari character</h2>
+  <canvas id='c' width='280' height='280'></canvas><br>
+  <button onclick='predict()'>Predict</button>
+  <button onclick='clearCanvas()'>Clear</button>
+  <div id='result'></div>
+  <div id='alts'></div>
+
+  <script>
+    const csrf = '{{ csrf_token }}';
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let drawing = false;
+
+    function clearCanvas() {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 16;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      document.getElementById('result').textContent = '';
+      document.getElementById('alts').textContent = '';
+    }
+    clearCanvas();
+
+    function pos(e) {
+      const r = c.getBoundingClientRect();
+      return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height];
+    }
+    c.addEventListener('pointerdown', e => { drawing = true; const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); });
+    c.addEventListener('pointermove', e => { if (drawing) { const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); } });
+    window.addEventListener('pointerup', () => { drawing = false; });
+
+    async function predict() {
+      const res = await fetch('/predict/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ image: c.toDataURL('image/png') })
+      });
+      const data = await res.json();
+      if (data.error) { document.getElementById('result').textContent = data.error; return; }
+      const p = data.predictions;
+      document.getElementById('result').textContent = p[0].char + '  (' + p[0].confidence + '%)';
+      document.getElementById('alts').textContent = 'Other guesses: ' + p.slice(1).map(x => x.char + ' ' + x.confidence + '%').join(', ');
+    }
+  </script>
+</body>
+</html>

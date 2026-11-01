@@ -1,0 +1,6 @@
+django
+gunicorn
+whitenoise
+numpy
+pillow
+ai-edge-litert
